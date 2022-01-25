@@ -134,7 +134,7 @@ int main(int argc, char** argv) {
 
     uncompData = 0;
     uncompDataHDR = 0;
-    if (load_dds("d:\\temp\\bc6hs.dds", &w, &h, &fourcc,(void**)&compData)) {
+    if (load_dds("d:\\temp\\dice_bc7.dds", &w, &h, &fourcc,(void**)&compData)) {
         switch (fourcc) {
             case BCDEC_FOURCC_DXT1:
             case BCDEC_FOURCC_DXT3:
@@ -151,19 +151,20 @@ int main(int argc, char** argv) {
                         if (fourcc == BCDEC_FOURCC_DXT1) {
                             bcdec_bc1(src, dst, w * 4);
                             src += BCDEC_BC1_BLOCK_SIZE;
-                        }
-                        else if (fourcc == BCDEC_FOURCC_DXT3) {
+                        } else if (fourcc == BCDEC_FOURCC_DXT3) {
                             bcdec_bc2(src, dst, w * 4);
                             src += BCDEC_BC2_BLOCK_SIZE;
-                        }
-                        else if (fourcc == BCDEC_FOURCC_DXT5) {
+                        } else if (fourcc == BCDEC_FOURCC_DXT5) {
                             bcdec_bc3(src, dst, w * 4);
                             src += BCDEC_BC3_BLOCK_SIZE;
+                        } else if (fourcc == DXGI_FORMAT_BC7_UNORM) {
+                            bcdec_bc7(src, dst, w * 4);
+                            src += BCDEC_BC7_BLOCK_SIZE;
                         }
                     }
                 }
 
-                stbi_write_tga("d:\\temp\\bc3.tga", w, h, 4, uncompData);
+                stbi_write_tga("d:\\temp\\dice_bc7.tga", w, h, 4, uncompData);
             } break;
 
             case DXGI_FORMAT_BC6H_UF16:
