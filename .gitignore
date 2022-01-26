@@ -14,3 +14,5 @@ _deps
 /debug
 /out
 /release
+/test_images/*.tga
+/test_images/*.hdr

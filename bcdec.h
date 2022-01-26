@@ -1,4 +1,31 @@
-﻿#ifndef BCDEC_HEADER_INCLUDED
+﻿/* bcdec.h - v0.9
+   provides functions to decompress blocks of BC compressed images
+   written by Sergii "iOrange" Kudlai in 2022
+
+   This library does not allocate memory and is trying to use as less stack as possible
+
+   The library was never optimized specifically for speed but for the overall size
+   it has zero external dependencies and is not using any runtime functions
+
+   Supported BC formats:
+   BC1 (also known as DXT1) + it's "binary alpha" variant BC1A (DXT1A)
+   BC2 (also known as DXT3)
+   BC3 (also known as DXT5)
+   BC4 (also known as ATI1N)
+   BC5 (also known as ATI2N)
+   BC6H (HDR format)
+   BC7
+
+   BC1/BC2/BC3/BC7 are expected to decompress into 4*4 RGBA blocks 8bit per component (32bit pixel)
+   BC4/BC5 are expected to decompress into 4*4 R/RG blocks 8bit per component (8bit and 16bit pixel)
+   BC6H is expected to decompress into 4*4 RGB blocks 32bit float per component (96bit pixel)
+
+   For more info, issues and suggestions please visit https://github.com/iOrange/bcdec
+
+   LICENSE: See end of file for license information.
+*/
+
+#ifndef BCDEC_HEADER_INCLUDED
 #define BCDEC_HEADER_INCLUDED
 
 /*  Used information sources:
@@ -1200,3 +1227,34 @@ void bcdec_bc7(void* compressedBlock, void* decompressedBlock, int destinationPi
 #endif /* BCDEC_IMPLEMENTATION */
 
 #endif /* BCDEC_HEADER_INCLUDED */
+
+/* LICENSE:
+
+Public Domain (www.unlicense.org)
+
+This is free and unencumbered software released into the public domain.
+
+Anyone is free to copy, modify, publish, use, compile, sell, or
+distribute this software, either in source code form or as a compiled
+binary, for any purpose, commercial or non-commercial, and by any
+means.
+
+In jurisdictions that recognize copyright laws, the author or authors
+of this software dedicate any and all copyright interest in the
+software to the public domain. We make this dedication for the benefit
+of the public at large and to the detriment of our heirs and
+successors. We intend this dedication to be an overt act of
+relinquishment in perpetuity of all present and future rights to this
+software under copyright law.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+For more information, please refer to <https://unlicense.org>
+
+*/

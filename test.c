@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
 #define STB_IMAGE_WRITE_IMPLEMENTATION 1
 #include "stb_image_write.h"
 
@@ -127,14 +129,41 @@ int load_dds(const char* filePath, int* w, int* h, unsigned int* fourcc, void** 
     return 1;
 }
 
+const char* format_name(int format) {
+    switch (format) {
+        case BCDEC_FOURCC_DXT1:     return "BC1";
+        case BCDEC_FOURCC_DXT3:     return "BC2";
+        case BCDEC_FOURCC_DXT5:     return "BC3";
+        case DXGI_FORMAT_BC4_UNORM: return "BC4";
+        case DXGI_FORMAT_BC5_UNORM: return "BC5";
+        case DXGI_FORMAT_BC7_UNORM: return "BC7";
+        case DXGI_FORMAT_BC6H_UF16: return "BC6H Unsigned";
+        case DXGI_FORMAT_BC6H_SF16: return "BC6H Signed";
+        default:                    return "Unknown";
+    }
+}
+
 int main(int argc, char** argv) {
     int w, h, fourcc, i, j;
     char* compData, * uncompData, * src, * dst;
-    float* uncompDataHDR, * dstHDR;;
+    float* uncompDataHDR, * dstHDR;
+    char path[260];
+
+    if (argc < 2) {
+        printf("Usage: bcdec.exe path/to/input.dds\n");
+        printf("       the decompressed image will be written to\n");
+        printf("       path/to/input.(tga, hdr)\n");
+        return -1;
+    }
+
+    strcpy_s(path, sizeof(path), argv[1]);
 
     uncompData = 0;
     uncompDataHDR = 0;
-    if (load_dds("d:\\temp\\dice_bc7.dds", &w, &h, &fourcc,(void**)&compData)) {
+    if (load_dds(path, &w, &h, &fourcc,(void**)&compData)) {
+        printf("Successfully loaded %s\n", path);
+        printf(" w = %d, h = %d, format = %s\n", w, h, format_name(fourcc));
+
         switch (fourcc) {
             case BCDEC_FOURCC_DXT1:
             case BCDEC_FOURCC_DXT3:
@@ -164,7 +193,57 @@ int main(int argc, char** argv) {
                     }
                 }
 
-                stbi_write_tga("d:\\temp\\dice_bc7.tga", w, h, 4, uncompData);
+                i = (int)strlen(path);
+                path[i - 3] = 't';
+                path[i - 2] = 'g';
+                path[i - 1] = 'a';
+
+                printf("Writing output to %s\n", path);
+                stbi_write_tga(path, w, h, 4, uncompData);
+            } break;
+
+            case DXGI_FORMAT_BC4_UNORM: {
+                uncompData = (char*)malloc(w * h);
+                src = compData;
+                dst = uncompData;
+
+                for (i = 0; i < h; i += 4) {
+                    for (j = 0; j < w; j += 4) {
+                        dst = uncompData + (i * w + j);
+                        bcdec_bc4(src, dst, w);
+                        src += BCDEC_BC4_BLOCK_SIZE;
+                    }
+                }
+
+                i = (int)strlen(path);
+                path[i - 3] = 't';
+                path[i - 2] = 'g';
+                path[i - 1] = 'a';
+
+                printf("Writing output to %s\n", path);
+                stbi_write_tga(path, w, h, 1, uncompData);
+            } break;
+
+            case DXGI_FORMAT_BC5_UNORM: {
+                uncompData = (char*)malloc(w * h * 2);
+                src = compData;
+                dst = uncompData;
+
+                for (i = 0; i < h; i += 4) {
+                    for (j = 0; j < w; j += 4) {
+                        dst = uncompData + (i * w + j) * 2;
+                        bcdec_bc5(src, dst, w * 2);
+                        src += BCDEC_BC5_BLOCK_SIZE;
+                    }
+                }
+
+                i = (int)strlen(path);
+                path[i - 3] = 't';
+                path[i - 2] = 'g';
+                path[i - 1] = 'a';
+
+                printf("Writing output to %s\n", path);
+                stbi_write_tga(path, w, h, 2, uncompData);
             } break;
 
             case DXGI_FORMAT_BC6H_UF16:
@@ -182,14 +261,26 @@ int main(int argc, char** argv) {
                     }
                 }
 
-                stbi_write_hdr("d:\\temp\\bc6hs.hdr", w, h, 3, uncompDataHDR);
+                i = (int)strlen(path);
+                path[i - 3] = 'h';
+                path[i - 2] = 'd';
+                path[i - 1] = 'r';
+
+                printf("Writing output to %s\n", path);
+                stbi_write_hdr(path, w, h, 3, uncompDataHDR);
             } break;
+
+            default:
+                printf("Unknown compression format, terminating\n");
         }
 
         free(compData);
         free(uncompData);
         free(uncompDataHDR);
+    } else {
+        printf("Failed to load %s\n", path);
+        return -1;
     }
 
-    return 0;
+    return (uncompData || uncompDataHDR) ? 0 : -1;
 }
