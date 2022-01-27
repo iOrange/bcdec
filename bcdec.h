@@ -1,4 +1,4 @@
-﻿/* bcdec.h - v0.9
+﻿/* bcdec.h - v0.91
    provides functions to decompress blocks of BC compressed images
    written by Sergii "iOrange" Kudlai in 2022
 
@@ -181,10 +181,10 @@ void bcdec__smooth_alpha_block(void* compressedBlock, void* decompressedBlock, i
     }
     else {
         /* 4 interpolated alpha values. */
-        alpha[2] = (4 * alpha[0] +     alpha[1]) / 5;       /* 4/5*alpha_0 + 1/5*alpha_1 */
-        alpha[3] = (3 * alpha[0] + 2 * alpha[1]) / 5;       /* 3/5*alpha_0 + 2/5*alpha_1 */
-        alpha[4] = (2 * alpha[0] + 3 * alpha[1]) / 5;       /* 2/5*alpha_0 + 3/5*alpha_1 */
-        alpha[5] = (    alpha[0] + 4 * alpha[1]) / 5;       /* 1/5*alpha_0 + 4/5*alpha_1 */
+        alpha[2] = (4 * alpha[0] +     alpha[1] + 1) / 5;   /* 4/5*alpha_0 + 1/5*alpha_1 */
+        alpha[3] = (3 * alpha[0] + 2 * alpha[1] + 1) / 5;   /* 3/5*alpha_0 + 2/5*alpha_1 */
+        alpha[4] = (2 * alpha[0] + 3 * alpha[1] + 1) / 5;   /* 2/5*alpha_0 + 3/5*alpha_1 */
+        alpha[5] = (    alpha[0] + 4 * alpha[1] + 1) / 5;   /* 1/5*alpha_0 + 4/5*alpha_1 */
         alpha[6] = 0x00;
         alpha[7] = 0xFF;
     }
