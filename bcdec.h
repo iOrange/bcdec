@@ -1,4 +1,4 @@
-﻿/* bcdec.h - v0.91
+﻿/* bcdec.h - v0.92
    provides functions to decompress blocks of BC compressed images
    written by Sergii "iOrange" Kudlai in 2022
 
@@ -42,6 +42,9 @@
 
     Leaving it here as it's a nice read
     https://fgiesen.wordpress.com/2021/10/04/gpu-bcn-decoding/
+
+    Fast half to float function from here
+    https://gist.github.com/rygorous/2144712
 */
 
 #define BCDEC_BC1_BLOCK_SIZE    8
@@ -230,7 +233,7 @@ int bcdec__bitstream_read_bits(bcdec__bitstream_t* bstream, int numBits) {
 }
 
 /*  reversed bits pulling, used in BC6H decoding
-    why Microsoft ?? just why ???                   */
+    why ?? just why ??? */
 int bcdec__bitstream_read_bits_r(bcdec__bitstream_t* bstream, int numBits) {
     int result = 0;
     while (numBits--) {
@@ -339,19 +342,31 @@ unsigned short bcdec__finish_unquantize(int val, int isSigned) {
     }
 }
 
-/* https://fgiesen.wordpress.com/2012/03/28/half-to-float-done-quic/ */
+/* modified half_to_float_fast4 from https://gist.github.com/rygorous/2144712 */
 float bcdec__half_to_float_quick(unsigned short half) {
-    static unsigned int magic = (254 - 15) << 23;
-    static unsigned int was_infnan = (127 + 16) << 23;
-    unsigned int o;
+    typedef union {
+        unsigned int u;
+        float f;
+    } FP32;
 
-    o = (half & 0x7FFF) << 13;                      /* exponent / mantissa bits */
-    *((float*)&o) *= *((float*)&magic);             /* exponent adjust */
-    if (*((float*)&o) >= *((float*)&was_infnan)) {  /* make sure Inf / NaN survive */
-        o |= 255 << 23;
+    static const FP32 magic = { 113 << 23 };
+    static const unsigned int shifted_exp = 0x7c00 << 13;   /* exponent mask after shift */
+    FP32 o;
+
+    o.u = (half & 0x7fff) << 13;                            /* exponent/mantissa bits */
+    unsigned int exp = shifted_exp & o.u;                   /* just the exponent */
+    o.u += (127 - 15) << 23;                                /* exponent adjust */
+
+    /* handle exponent special cases */
+    if (exp == shifted_exp) {                               /* Inf/NaN? */
+        o.u += (128 - 16) << 23;                            /* extra exp adjust */
+    } else if (exp == 0) {                                  /* Zero/Denormal? */
+        o.u += 1 << 23;                                     /* extra exp adjust */
+        o.f -= magic.f;                                     /* renormalize */
     }
-    o |= (half & 0x8000) << 16;                     /* sign bit */
-    return *((float*)&o);
+
+    o.u |= (half & 0x8000) << 16;                           /* sign bit */
+    return o.f;
 }
 
 void bcdec_bc6h(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned) {
