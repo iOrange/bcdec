@@ -82,62 +82,60 @@ void bcdec_bc7(const void* compressedBlock, void* decompressedBlock, int destina
 
 #ifdef BCDEC_IMPLEMENTATION
 
-typedef struct bcdec__rgba {
-    unsigned char r, g, b, a;
-} bcdec__rgba_t;
-
 void bcdec__color_block(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int onlyOpaqueMode) {
     unsigned short c0, c1;
-    bcdec__rgba_t refColors[4];
+    unsigned int refColors[4]; /* 0xAABBGGRR */
     unsigned char* dstColors;
-    unsigned char* colorIndices;
+    unsigned int colorIndices;
     int i, j, idx;
-
-    refColors[0].a = refColors[1].a = refColors[2].a = refColors[3].a = 0xFF;
+    unsigned int r0, g0, b0, r1, g1, b1, r, g, b;
 
     c0 = ((unsigned short*)compressedBlock)[0];
     c1 = ((unsigned short*)compressedBlock)[1];
 
     /* Expand 565 ref colors to 888 */
-    refColors[0].r = (((c0 >> 11) & 0x1F) * 527 + 23) >> 6;
-    refColors[0].g = (((c0 >> 5)  & 0x3F) * 259 + 33) >> 6;
-    refColors[0].b =  ((c0        & 0x1F) * 527 + 23) >> 6;
+    r0 = (((c0 >> 11) & 0x1F) * 527 + 23) >> 6;
+    g0 = (((c0 >> 5)  & 0x3F) * 259 + 33) >> 6;
+    b0 =  ((c0        & 0x1F) * 527 + 23) >> 6;
+    refColors[0] = 0xFF000000 | (b0 << 16) | (g0 << 8) | r0;
 
-    refColors[1].r = (((c1 >> 11) & 0x1F) * 527 + 23) >> 6;
-    refColors[1].g = (((c1 >> 5)  & 0x3F) * 259 + 33) >> 6;
-    refColors[1].b =  ((c1        & 0x1F) * 527 + 23) >> 6;
+    r1 = (((c1 >> 11) & 0x1F) * 527 + 23) >> 6;
+    g1 = (((c1 >> 5)  & 0x3F) * 259 + 33) >> 6;
+    b1 =  ((c1        & 0x1F) * 527 + 23) >> 6;
+    refColors[1] = 0xFF000000 | (b1 << 16) | (g1 << 8) | r1;
 
     if (c0 > c1 || onlyOpaqueMode) {    /* Standard BC1 mode (also BC3 color block uses ONLY this mode) */
         /* color_2 = 2/3*color_0 + 1/3*color_1
            color_3 = 1/3*color_0 + 2/3*color_1 */
-        refColors[2].r = (2 * refColors[0].r + refColors[1].r + 1) / 3;
-        refColors[2].g = (2 * refColors[0].g + refColors[1].g + 1) / 3;
-        refColors[2].b = (2 * refColors[0].b + refColors[1].b + 1) / 3;
+        r = (2 * r0 + r1 + 1) / 3;
+        g = (2 * g0 + g1 + 1) / 3;
+        b = (2 * b0 + b1 + 1) / 3;
+        refColors[2] = 0xFF000000 | (b << 16) | (g << 8) | r;
 
-        refColors[3].r = (refColors[0].r + 2 * refColors[1].r + 1) / 3;
-        refColors[3].g = (refColors[0].g + 2 * refColors[1].g + 1) / 3;
-        refColors[3].b = (refColors[0].b + 2 * refColors[1].b + 1) / 3;
+        r = (r0 + 2 * r1 + 1) / 3;
+        g = (g0 + 2 * g1 + 1) / 3;
+        b = (b0 + 2 * b1 + 1) / 3;
+        refColors[3] = 0xFF000000 | (b << 16) | (g << 8) | r;
     } else {                            /* Quite rare BC1A mode */
         /* color_2 = 1/2*color_0 + 1/2*color_1;
            color_3 = 0;                         */
-        refColors[2].r = (refColors[0].r + refColors[1].r + 1) >> 1;
-        refColors[2].g = (refColors[0].g + refColors[1].g + 1) >> 1;
-        refColors[2].b = (refColors[0].b + refColors[1].b + 1) >> 1;
+        r = (r0 + r1 + 1) >> 1;
+        g = (g0 + g1 + 1) >> 1;
+        b = (b0 + b1 + 1) >> 1;
+        refColors[2] = 0xFF000000 | (b << 16) | (g << 8) | r;
 
-        refColors[3].r = refColors[3].g = refColors[3].b = refColors[3].a = 0;
+        refColors[3] = 0x00000000;
     }
 
-    colorIndices = ((unsigned char*)compressedBlock) + 4;
+    colorIndices = ((unsigned int*)compressedBlock)[1];
 
     /* Fill out the decompressed color block */
     dstColors = (unsigned char*)decompressedBlock;
     for (i = 0; i < 4; ++i) {
         for (j = 0; j < 4; ++j) {
-            idx = (colorIndices[i] >> (2 * j)) & 0x03;
-            dstColors[4 * j + 0] = refColors[idx].r;
-            dstColors[4 * j + 1] = refColors[idx].g;
-            dstColors[4 * j + 2] = refColors[idx].b;
-            dstColors[4 * j + 3] = refColors[idx].a;
+            idx = colorIndices & 0x03;
+            ((unsigned int*)dstColors)[j] = refColors[idx];
+            colorIndices >>= 2;
         }
 
         dstColors += destinationPitch;
@@ -162,16 +160,16 @@ void bcdec__sharp_alpha_block(const void* compressedBlock, void* decompressedBlo
 }
 
 void bcdec__smooth_alpha_block(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int pixelSize) {
-    unsigned char* block;
     unsigned char* decompressed;
     unsigned char alpha[8];
-    int i, j, indices;
+    int i, j;
+    unsigned long long block, indices;
 
-    block = (unsigned char*)compressedBlock;
+    block = *(unsigned long long*)compressedBlock;
     decompressed = (unsigned char*)decompressedBlock;
 
-    alpha[0] = block[0];
-    alpha[1] = block[1];
+    alpha[0] = block & 0xFF;
+    alpha[1] = (block >> 8) & 0xFF;
 
     if (alpha[0] > alpha[1]) {
         /* 6 interpolated alpha values. */
@@ -192,8 +190,7 @@ void bcdec__smooth_alpha_block(const void* compressedBlock, void* decompressedBl
         alpha[7] = 0xFF;
     }
 
-    /* first 8 indices */
-    indices = block[2] | (block[3] << 8) | (block[4] << 16);
+    indices = block >> 16;
     for (i = 0; i < 4; ++i) {
         for (j = 0; j < 4; ++j) {
             decompressed[j * pixelSize] = alpha[indices & 0x07];
@@ -201,44 +198,41 @@ void bcdec__smooth_alpha_block(const void* compressedBlock, void* decompressedBl
         }
 
         decompressed += destinationPitch;
-
-        if (i == 1) {
-            /* second 8 indices */
-            indices = block[5] | (block[6] << 8) | (block[7] << 16);
-        }
     }
 }
 
 typedef struct bcdec__bitstream {
-    unsigned char*  bitstream;
-    int             bitPos;
+    unsigned long long low;
+    unsigned long long high;
 } bcdec__bitstream_t;
 
-int bcdec__bitstream_read_bit(bcdec__bitstream_t* bstream) {
-    int i, b;
+int bcdec__bitstream_read_bits(bcdec__bitstream_t* bstream, int numBits) {
+    unsigned int mask = (1 << numBits) - 1;
+    /* Read the low N bits */
+    unsigned int bits = (bstream->low & mask);
 
-    i = bstream->bitPos >> 3;
-    b = (bstream->bitstream[i] >> (bstream->bitPos - (i << 3))) & 0x01;
-    bstream->bitPos++;
-    return b;
+    bstream->low >>= numBits;
+    /* Put the low N bits of "high" into the high 64-N bits of "low". */
+    bstream->low |= (bstream->high & mask) << (sizeof(bstream->high) * 8 - numBits);
+    bstream->high >>= numBits;
+    
+    return bits;
 }
 
-int bcdec__bitstream_read_bits(bcdec__bitstream_t* bstream, int numBits) {
-    int result = 0, i = numBits;
-    while (i) {
-        result |= (bcdec__bitstream_read_bit(bstream) << (numBits - i));
-        i--;
-    }
-    return result;
+int bcdec__bitstream_read_bit(bcdec__bitstream_t* bstream) {
+    return bcdec__bitstream_read_bits(bstream, 1);
 }
 
 /*  reversed bits pulling, used in BC6H decoding
     why ?? just why ??? */
 int bcdec__bitstream_read_bits_r(bcdec__bitstream_t* bstream, int numBits) {
+    int bits = bcdec__bitstream_read_bits(bstream, numBits);
+    /* Reverse the bits. */
     int result = 0;
     while (numBits--) {
         result <<= 1;
-        result |= bcdec__bitstream_read_bit(bstream);
+        result |= (bits & 1);
+        bits >>= 1;
     }
     return result;
 }
@@ -426,8 +420,8 @@ void bcdec_bc6h(const void* compressedBlock, void* decompressedBlock, int destin
 
     decompressed = (float*)decompressedBlock;
 
-    bstream.bitstream = (unsigned char*)compressedBlock;
-    bstream.bitPos = 0;
+    bstream.low = ((unsigned long long*)compressedBlock)[0];
+    bstream.high = ((unsigned long long*)compressedBlock)[1];
 
     r[0] = r[1] = r[2] = r[3] = 0;
     g[0] = g[1] = g[2] = g[3] = 0;
@@ -1047,8 +1041,8 @@ void bcdec_bc7(const void* compressedBlock, void* decompressedBlock, int destina
 
     decompressed = (unsigned char*)decompressedBlock;
 
-    bstream.bitstream = (unsigned char*)compressedBlock;
-    bstream.bitPos = 0;
+    bstream.low = ((unsigned long long*)compressedBlock)[0];
+    bstream.high = ((unsigned long long*)compressedBlock)[1];
 
     for (mode = 0; mode < 8 && (0 == bcdec__bitstream_read_bit(&bstream)); ++mode);
 
