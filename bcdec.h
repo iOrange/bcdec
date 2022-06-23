@@ -1,4 +1,4 @@
-﻿/* bcdec.h - v0.92
+﻿/* bcdec.h - v0.93
    provides functions to decompress blocks of BC compressed images
    written by Sergii "iOrange" Kudlai in 2022
 
@@ -21,6 +21,10 @@
    BC6H is expected to decompress into 4*4 RGB blocks 32bit float per component (96bit pixel)
 
    For more info, issues and suggestions please visit https://github.com/iOrange/bcdec
+
+   CREDITS:
+      Aras Pranckevicius (@aras-p)      - BC1/BC3 decoders optimizations (up to 3x the speed)
+                                        - BC6H/BC7 bits pulling routines optimizations
 
    LICENSE: See end of file for license information.
 */
@@ -346,9 +350,10 @@ float bcdec__half_to_float_quick(unsigned short half) {
     static const FP32 magic = { 113 << 23 };
     static const unsigned int shifted_exp = 0x7c00 << 13;   /* exponent mask after shift */
     FP32 o;
+    unsigned int exp;
 
     o.u = (half & 0x7fff) << 13;                            /* exponent/mantissa bits */
-    unsigned int exp = shifted_exp & o.u;                   /* just the exponent */
+    exp = shifted_exp & o.u;                                /* just the exponent */
     o.u += (127 - 15) << 23;                                /* exponent adjust */
 
     /* handle exponent special cases */
