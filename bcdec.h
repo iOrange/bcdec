@@ -18,7 +18,8 @@
 
    BC1/BC2/BC3/BC7 are expected to decompress into 4*4 RGBA blocks 8bit per component (32bit pixel)
    BC4/BC5 are expected to decompress into 4*4 R/RG blocks 8bit per component (8bit and 16bit pixel)
-   BC6H is expected to decompress into 4*4 RGB blocks 32bit float per component (96bit pixel)
+   BC6H is expected to decompress into 4*4 RGB blocks of either 32bit float or 16bit "half" per
+   component (96bit or 48bit pixel)
 
    For more info, issues and suggestions please visit https://github.com/iOrange/bcdec
 
@@ -76,7 +77,8 @@ void bcdec_bc2(const void* compressedBlock, void* decompressedBlock, int destina
 void bcdec_bc3(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
 void bcdec_bc4(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
 void bcdec_bc5(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
-void bcdec_bc6h(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned);
+void bcdec_bc6h_float(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned);
+void bcdec_bc6h_half(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned);
 void bcdec_bc7(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
 
 #ifdef __cplusplus
@@ -368,7 +370,7 @@ float bcdec__half_to_float_quick(unsigned short half) {
     return o.f;
 }
 
-void bcdec_bc6h(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned) {
+void bcdec_bc6h_half(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned) {
     static char actual_bits_count[4][14] = {
         { 10, 7, 11, 11, 11, 9, 8, 8, 8, 6, 10, 11, 12, 16 },   /*  W */
         {  5, 6,  5,  4,  4, 5, 6, 5, 5, 6, 10,  9,  8,  4 },   /* dR */
@@ -421,9 +423,9 @@ void bcdec_bc6h(const void* compressedBlock, void* decompressedBlock, int destin
     int mode, partition, numPartitions, i, j, partitionSet, indexBits, index;
     int r[4], g[4], b[4];       /* wxyz */
     int epR[2], epG[2], epB[2]; /* endpoints A and B */
-    float* decompressed;
+    unsigned short* decompressed;
 
-    decompressed = (float*)decompressedBlock;
+    decompressed = (unsigned short*)decompressedBlock;
 
     bstream.low = ((unsigned long long*)compressedBlock)[0];
     bstream.high = ((unsigned long long*)compressedBlock)[1];
@@ -866,19 +868,35 @@ void bcdec_bc6h(const void* compressedBlock, void* decompressedBlock, int destin
             epG[1] = bcdec__unquantize(g[partitionSet * 2 + 1], actual_bits_count[0][mode], isSigned);
             epB[1] = bcdec__unquantize(b[partitionSet * 2 + 1], actual_bits_count[0][mode], isSigned);
 
-            decompressed[j * 3 + 0] = bcdec__half_to_float_quick(
-                                        bcdec__finish_unquantize(
-                                            bcdec__interpolate(epR[0], epR[1], (mode >= 10) ? aWeight4 : aWeight3, index), isSigned));
-            decompressed[j * 3 + 1] = bcdec__half_to_float_quick(
-                                        bcdec__finish_unquantize(
-                                            bcdec__interpolate(epG[0], epG[1], (mode >= 10) ? aWeight4 : aWeight3, index), isSigned));
-            decompressed[j * 3 + 2] = bcdec__half_to_float_quick(
-                                        bcdec__finish_unquantize(
-                                            bcdec__interpolate(epB[0], epB[1], (mode >= 10) ? aWeight4 : aWeight3, index), isSigned));
+            decompressed[j * 3 + 0] = bcdec__finish_unquantize(
+                                            bcdec__interpolate(epR[0], epR[1], (mode >= 10) ? aWeight4 : aWeight3, index), isSigned);
+            decompressed[j * 3 + 1] = bcdec__finish_unquantize(
+                                            bcdec__interpolate(epG[0], epG[1], (mode >= 10) ? aWeight4 : aWeight3, index), isSigned);
+            decompressed[j * 3 + 2] = bcdec__finish_unquantize(
+                                            bcdec__interpolate(epB[0], epB[1], (mode >= 10) ? aWeight4 : aWeight3, index), isSigned);
         }
 
         decompressed += destinationPitch;
     }
+}
+
+void bcdec_bc6h_float(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned) {
+    unsigned short block[16*3];
+    float* decompressed;
+    const unsigned short* b;
+    int i, j;
+
+    bcdec_bc6h_half(compressedBlock, block, 4*3, isSigned);
+    b = block;
+    decompressed = (float*)decompressedBlock;
+    for (i = 0; i < 4; ++i) {
+        for (j = 0; j < 4; ++j) {
+            decompressed[j * 3 + 0] = bcdec__half_to_float_quick(*b++);
+            decompressed[j * 3 + 1] = bcdec__half_to_float_quick(*b++);
+            decompressed[j * 3 + 2] = bcdec__half_to_float_quick(*b++);
+        }
+        decompressed += destinationPitch;
+    }    
 }
 
 void bcdec__swap_values(int* a, int* b) {
