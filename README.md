@@ -23,7 +23,8 @@ It has zero external dependencies and is not using any runtime functions.
 
 BC1/BC2/BC3/BC7 are expected to decompress into 4\*4 RGBA blocks 8bit per component (32bit pixel)  
 BC4/BC5 are expected to decompress into 4\*4 R/RG blocks 8bit per component (8bit and 16bit pixel)  
-BC6H is expected to decompress into 4\*4 RGB blocks 32bit float per component (96bit pixel)
+BC6H is expected to decompress into 4*4 RGB blocks of either 32bit float or 16bit "half" per
+component (96bit or 48bit pixel)
 
 ---
 
