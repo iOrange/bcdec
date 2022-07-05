@@ -1,4 +1,4 @@
-﻿/* bcdec.h - v0.93
+﻿/* bcdec.h - v0.94
    provides functions to decompress blocks of BC compressed images
    written by Sergii "iOrange" Kudlai in 2022
 
@@ -26,6 +26,8 @@
    CREDITS:
       Aras Pranckevicius (@aras-p)      - BC1/BC3 decoders optimizations (up to 3x the speed)
                                         - BC6H/BC7 bits pulling routines optimizations
+                                        - Split BC6H decompression function into 'half' and
+                                          'float' variants
 
    LICENSE: See end of file for license information.
 */
@@ -805,9 +807,9 @@ void bcdec_bc6h_half(const void* compressedBlock, void* decompressedBlock, int d
                must contain all zeroes in all channels except for the alpha channel. */
             for (i = 0; i < 4; ++i) {
                 for (j = 0; j < 4; ++j) {
-                    decompressed[j * 3 + 0] = 0.0f;
-                    decompressed[j * 3 + 1] = 0.0f;
-                    decompressed[j * 3 + 2] = 0.0f;
+                    decompressed[j * 3 + 0] = 0;
+                    decompressed[j * 3 + 1] = 0;
+                    decompressed[j * 3 + 2] = 0;
                 }
                 decompressed += destinationPitch;
             }
@@ -896,7 +898,7 @@ void bcdec_bc6h_float(const void* compressedBlock, void* decompressedBlock, int 
             decompressed[j * 3 + 2] = bcdec__half_to_float_quick(*b++);
         }
         decompressed += destinationPitch;
-    }    
+    }
 }
 
 void bcdec__swap_values(int* a, int* b) {
@@ -1262,7 +1264,33 @@ void bcdec_bc7(const void* compressedBlock, void* decompressedBlock, int destina
 
 /* LICENSE:
 
-Public Domain (www.unlicense.org)
+This software is available under 2 licenses -- choose whichever you prefer.
+
+------------------------------------------------------------------------------
+ALTERNATIVE A - MIT License
+
+Copyright (c) 2022 Sergii Kudlai
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+------------------------------------------------------------------------------
+ALTERNATIVE B - The Unlicense
 
 This is free and unencumbered software released into the public domain.
 

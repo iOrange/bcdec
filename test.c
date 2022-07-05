@@ -256,7 +256,7 @@ int main(int argc, char** argv) {
                 for (i = 0; i < h; i += 4) {
                     for (j = 0; j < w; j += 4) {
                         dstHDR = uncompDataHDR + (i * w + j) * 3;
-                        bcdec_bc6h(src, dstHDR, w * 3, fourcc == DXGI_FORMAT_BC6H_SF16);
+                        bcdec_bc6h_float(src, dstHDR, w * 3, fourcc == DXGI_FORMAT_BC6H_SF16);
                         src += BCDEC_BC6H_BLOCK_SIZE;
                     }
                 }
