@@ -1,3 +1,4 @@
+#define __STDC_WANT_LIB_EXT1__ 1
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -150,13 +151,18 @@ int main(int argc, char** argv) {
     char path[260];
 
     if (argc < 2) {
-        printf("Usage: bcdec.exe path/to/input.dds\n");
+        printf("Usage: %s path/to/input.dds\n", argv[0]);
         printf("       the decompressed image will be written to\n");
         printf("       path/to/input.(tga, hdr)\n");
         return -1;
     }
 
+#if defined(__STDC_LIB_EXT1__) || (_MSC_VER >= 1900)
     strcpy_s(path, sizeof(path), argv[1]);
+#else
+    strncpy(path, argv[1], sizeof(path) - 1);
+    path[sizeof(path) - 1] = '\0';
+#endif
 
     uncompData = 0;
     uncompDataHDR = 0;
