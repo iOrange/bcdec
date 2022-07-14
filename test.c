@@ -82,8 +82,16 @@ int load_dds(const char* filePath, int* w, int* h, unsigned int* fourcc, void** 
     unsigned int magic, compressedSize;
     DDSURFACEDESC2_t ddsDesc;
     DDS_HEADER_DXT10_t dx10Desc;
+    FILE* f;
 
-    FILE* f = fopen(filePath, "rb");
+#if defined(__STDC_LIB_EXT1__) || (_MSC_VER >= 1900)
+    if (0 != fopen_s(&f, filePath, "rb")) {
+        return 0;
+    }
+#else
+    f = fopen(filePath, "rb");
+#endif
+
     if (!f) {
         return 0;
     }

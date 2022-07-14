@@ -42,3 +42,4 @@ Used HDRI image "Lythwood Room" from <https://polyhaven.com/a/lythwood_room> lic
  - Aras Pranckevičius (@aras-p)
      - BC1/BC3 decoders optimizations (up to 3x the speed)
      - BC6H/BC7 bits pulling routines optimizations
+     - Split BC6H decompression function into 'half' and 'float' variants

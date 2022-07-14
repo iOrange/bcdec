@@ -1,4 +1,4 @@
-﻿/* bcdec.h - v0.94
+﻿/* bcdec.h - v0.95
    provides functions to decompress blocks of BC compressed images
    written by Sergii "iOrange" Kudlai in 2022
 
@@ -29,11 +29,27 @@
                                         - Split BC6H decompression function into 'half' and
                                           'float' variants
 
+   bugfixes:
+      @linkmauve
+
    LICENSE: See end of file for license information.
 */
 
 #ifndef BCDEC_HEADER_INCLUDED
 #define BCDEC_HEADER_INCLUDED
+
+/* if BCDEC_STATIC causes problems, try defining BCDECDEF to 'inline' or 'static inline' */
+#ifndef BCDECDEF
+#ifdef BCDEC_STATIC
+#define BCDECDEF    static
+#else
+#ifdef __cplusplus
+#define BCDECDEF    extern "C"
+#else
+#define BCDECDEF    extern
+#endif
+#endif
+#endif
 
 /*  Used information sources:
     https://docs.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-block-compression
@@ -70,27 +86,19 @@
 #define BCDEC_BC6H_COMPRESSED_SIZE(w, h)    ((((w)>>2)*((h)>>2))*BCDEC_BC6H_BLOCK_SIZE)
 #define BCDEC_BC7_COMPRESSED_SIZE(w, h)     ((((w)>>2)*((h)>>2))*BCDEC_BC7_BLOCK_SIZE)
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
-
-void bcdec_bc1(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
-void bcdec_bc2(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
-void bcdec_bc3(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
-void bcdec_bc4(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
-void bcdec_bc5(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
-void bcdec_bc6h_float(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned);
-void bcdec_bc6h_half(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned);
-void bcdec_bc7(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
-
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
+BCDECDEF void bcdec_bc1(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
+BCDECDEF void bcdec_bc2(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
+BCDECDEF void bcdec_bc3(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
+BCDECDEF void bcdec_bc4(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
+BCDECDEF void bcdec_bc5(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
+BCDECDEF void bcdec_bc6h_float(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned);
+BCDECDEF void bcdec_bc6h_half(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned);
+BCDECDEF void bcdec_bc7(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
 
 
 #ifdef BCDEC_IMPLEMENTATION
 
-void bcdec__color_block(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int onlyOpaqueMode) {
+static void bcdec__color_block(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int onlyOpaqueMode) {
     unsigned short c0, c1;
     unsigned int refColors[4]; /* 0xAABBGGRR */
     unsigned char* dstColors;
@@ -150,7 +158,7 @@ void bcdec__color_block(const void* compressedBlock, void* decompressedBlock, in
     }
 }
 
-void bcdec__sharp_alpha_block(const void* compressedBlock, void* decompressedBlock, int destinationPitch) {
+static void bcdec__sharp_alpha_block(const void* compressedBlock, void* decompressedBlock, int destinationPitch) {
     unsigned short* alpha;
     unsigned char* decompressed;
     int i, j;
@@ -167,7 +175,7 @@ void bcdec__sharp_alpha_block(const void* compressedBlock, void* decompressedBlo
     }
 }
 
-void bcdec__smooth_alpha_block(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int pixelSize) {
+static void bcdec__smooth_alpha_block(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int pixelSize) {
     unsigned char* decompressed;
     unsigned char alpha[8];
     int i, j;
@@ -214,7 +222,7 @@ typedef struct bcdec__bitstream {
     unsigned long long high;
 } bcdec__bitstream_t;
 
-int bcdec__bitstream_read_bits(bcdec__bitstream_t* bstream, int numBits) {
+static int bcdec__bitstream_read_bits(bcdec__bitstream_t* bstream, int numBits) {
     unsigned int mask = (1 << numBits) - 1;
     /* Read the low N bits */
     unsigned int bits = (bstream->low & mask);
@@ -227,13 +235,13 @@ int bcdec__bitstream_read_bits(bcdec__bitstream_t* bstream, int numBits) {
     return bits;
 }
 
-int bcdec__bitstream_read_bit(bcdec__bitstream_t* bstream) {
+static int bcdec__bitstream_read_bit(bcdec__bitstream_t* bstream) {
     return bcdec__bitstream_read_bits(bstream, 1);
 }
 
 /*  reversed bits pulling, used in BC6H decoding
     why ?? just why ??? */
-int bcdec__bitstream_read_bits_r(bcdec__bitstream_t* bstream, int numBits) {
+static int bcdec__bitstream_read_bits_r(bcdec__bitstream_t* bstream, int numBits) {
     int bits = bcdec__bitstream_read_bits(bstream, numBits);
     /* Reverse the bits. */
     int result = 0;
@@ -247,35 +255,35 @@ int bcdec__bitstream_read_bits_r(bcdec__bitstream_t* bstream, int numBits) {
 
 
 
-void bcdec_bc1(const void* compressedBlock, void* decompressedBlock, int destinationPitch) {
+BCDECDEF void bcdec_bc1(const void* compressedBlock, void* decompressedBlock, int destinationPitch) {
     bcdec__color_block(compressedBlock, decompressedBlock, destinationPitch, 0);
 }
 
-void bcdec_bc2(const void* compressedBlock, void* decompressedBlock, int destinationPitch) {
+BCDECDEF void bcdec_bc2(const void* compressedBlock, void* decompressedBlock, int destinationPitch) {
     bcdec__color_block(((char*)compressedBlock) + 8, decompressedBlock, destinationPitch, 1);
     bcdec__sharp_alpha_block(compressedBlock, ((char*)decompressedBlock) + 3, destinationPitch);
 }
 
-void bcdec_bc3(const void* compressedBlock, void* decompressedBlock, int destinationPitch) {
+BCDECDEF void bcdec_bc3(const void* compressedBlock, void* decompressedBlock, int destinationPitch) {
     bcdec__color_block(((char*)compressedBlock) + 8, decompressedBlock, destinationPitch, 1);
     bcdec__smooth_alpha_block(compressedBlock, ((char*)decompressedBlock) + 3, destinationPitch, 4);
 }
 
-void bcdec_bc4(const void* compressedBlock, void* decompressedBlock, int destinationPitch) {
+BCDECDEF void bcdec_bc4(const void* compressedBlock, void* decompressedBlock, int destinationPitch) {
     bcdec__smooth_alpha_block(compressedBlock, decompressedBlock, destinationPitch, 1);
 }
 
-void bcdec_bc5(const void* compressedBlock, void* decompressedBlock, int destinationPitch) {
+BCDECDEF void bcdec_bc5(const void* compressedBlock, void* decompressedBlock, int destinationPitch) {
     bcdec__smooth_alpha_block(compressedBlock, decompressedBlock, destinationPitch, 2);
     bcdec__smooth_alpha_block(((char*)compressedBlock) + 8, ((char*)decompressedBlock) + 1, destinationPitch, 2);
 }
 
 /* http://graphics.stanford.edu/~seander/bithacks.html#VariableSignExtend */
-int bcdec__extend_sign(int val, int bits) {
+static int bcdec__extend_sign(int val, int bits) {
     return (val << (32 - bits)) >> (32 - bits);
 }
 
-int bcdec__transform_inverse(int val, int a0, int bits, int isSigned) {
+static int bcdec__transform_inverse(int val, int a0, int bits, int isSigned) {
     /* If the precision of A0 is "p" bits, then the transform algorithm is:
        B0 = (B0 + A0) & ((1 << p) - 1) */
     val = (val + a0) & ((1 << bits) - 1);
@@ -286,7 +294,7 @@ int bcdec__transform_inverse(int val, int a0, int bits, int isSigned) {
 }
 
 /* pretty much copy-paste from documentation */
-int bcdec__unquantize(int val, int bits, int isSigned) {
+static int bcdec__unquantize(int val, int bits, int isSigned) {
     int unq, s = 0;
 
     if (!isSigned) {
@@ -324,11 +332,11 @@ int bcdec__unquantize(int val, int bits, int isSigned) {
     return unq;
 }
 
-int bcdec__interpolate(int a, int b, int* weights, int index) {
+static int bcdec__interpolate(int a, int b, int* weights, int index) {
     return (a * (64 - weights[index]) + b * weights[index] + 32) >> 6;
 }
 
-unsigned short bcdec__finish_unquantize(int val, int isSigned) {
+static unsigned short bcdec__finish_unquantize(int val, int isSigned) {
     int s;
 
     if (!isSigned) {
@@ -345,7 +353,7 @@ unsigned short bcdec__finish_unquantize(int val, int isSigned) {
 }
 
 /* modified half_to_float_fast4 from https://gist.github.com/rygorous/2144712 */
-float bcdec__half_to_float_quick(unsigned short half) {
+static float bcdec__half_to_float_quick(unsigned short half) {
     typedef union {
         unsigned int u;
         float f;
@@ -372,7 +380,7 @@ float bcdec__half_to_float_quick(unsigned short half) {
     return o.f;
 }
 
-void bcdec_bc6h_half(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned) {
+BCDECDEF void bcdec_bc6h_half(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned) {
     static char actual_bits_count[4][14] = {
         { 10, 7, 11, 11, 11, 9, 8, 8, 8, 6, 10, 11, 12, 16 },   /*  W */
         {  5, 6,  5,  4,  4, 5, 6, 5, 5, 6, 10,  9,  8,  4 },   /* dR */
@@ -882,7 +890,7 @@ void bcdec_bc6h_half(const void* compressedBlock, void* decompressedBlock, int d
     }
 }
 
-void bcdec_bc6h_float(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned) {
+BCDECDEF void bcdec_bc6h_float(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned) {
     unsigned short block[16*3];
     float* decompressed;
     const unsigned short* b;
@@ -901,11 +909,11 @@ void bcdec_bc6h_float(const void* compressedBlock, void* decompressedBlock, int 
     }
 }
 
-void bcdec__swap_values(int* a, int* b) {
+static void bcdec__swap_values(int* a, int* b) {
     a[0] ^= b[0], b[0] ^= a[0], a[0] ^= b[0];
 }
 
-void bcdec_bc7(const void* compressedBlock, void* decompressedBlock, int destinationPitch) {
+BCDECDEF void bcdec_bc7(const void* compressedBlock, void* decompressedBlock, int destinationPitch) {
     static char actual_bits_count[2][8] = {
         { 4, 6, 5, 7, 5, 7, 7, 5 },     /* RGBA  */
         { 0, 0, 0, 0, 6, 8, 7, 5 },     /* Alpha */
