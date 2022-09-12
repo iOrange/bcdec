@@ -430,10 +430,10 @@ BCDECDEF void bcdec_bc6h_half(const void* compressedBlock, void* decompressedBlo
     static int aWeight4[16] = { 0, 4, 9, 13, 17, 21, 26, 30, 34, 38, 43, 47, 51, 55, 60, 64 };
 
     bcdec__bitstream_t bstream;
-    int mode, partition, numPartitions, i, j, partitionSet, indexBits, index;
+    int mode, partition, numPartitions, i, j, partitionSet, indexBits, index, ep_i;
     int r[4], g[4], b[4];       /* wxyz */
-    int epR[2], epG[2], epB[2]; /* endpoints A and B */
     unsigned short* decompressed;
+    int* weights;
 
     decompressed = (unsigned short*)decompressedBlock;
 
@@ -833,10 +833,11 @@ BCDECDEF void bcdec_bc6h_half(const void* compressedBlock, void* decompressedBlo
         numPartitions = 1;
     }
 
+    int actualBits0Mode = actual_bits_count[0][mode];
     if (isSigned) {
-        r[0] = bcdec__extend_sign(r[0], actual_bits_count[0][mode]);
-        g[0] = bcdec__extend_sign(g[0], actual_bits_count[0][mode]);
-        b[0] = bcdec__extend_sign(b[0], actual_bits_count[0][mode]);
+        r[0] = bcdec__extend_sign(r[0], actualBits0Mode);
+        g[0] = bcdec__extend_sign(g[0], actualBits0Mode);
+        b[0] = bcdec__extend_sign(b[0], actualBits0Mode);
     }
 
     /* Mode 11 (like Mode 10) does not use delta compression,
@@ -851,12 +852,19 @@ BCDECDEF void bcdec_bc6h_half(const void* compressedBlock, void* decompressedBlo
 
     if (mode != 9 && mode != 10) {
         for (i = 1; i < (numPartitions + 1) * 2; ++i) {
-            r[i] = bcdec__transform_inverse(r[i], r[0], actual_bits_count[0][mode], isSigned);
-            g[i] = bcdec__transform_inverse(g[i], g[0], actual_bits_count[0][mode], isSigned);
-            b[i] = bcdec__transform_inverse(b[i], b[0], actual_bits_count[0][mode], isSigned);
+            r[i] = bcdec__transform_inverse(r[i], r[0], actualBits0Mode, isSigned);
+            g[i] = bcdec__transform_inverse(g[i], g[0], actualBits0Mode, isSigned);
+            b[i] = bcdec__transform_inverse(b[i], b[0], actualBits0Mode, isSigned);
         }
     }
 
+    for (i = 0; i < (numPartitions + 1) * 2; ++i) {
+        r[i] = bcdec__unquantize(r[i], actualBits0Mode, isSigned);
+        g[i] = bcdec__unquantize(g[i], actualBits0Mode, isSigned);
+        b[i] = bcdec__unquantize(b[i], actualBits0Mode, isSigned);
+    }
+
+    weights = (mode >= 10) ? aWeight4 : aWeight3;
     for (i = 0; i < 4; ++i) {
         for (j = 0; j < 4; ++j) {
             partitionSet = (mode >= 10) ? ((i|j) ? 0 : 128) : partition_sets[partition][i][j];
@@ -871,19 +879,13 @@ BCDECDEF void bcdec_bc6h_half(const void* compressedBlock, void* decompressedBlo
 
             index = bcdec__bitstream_read_bits(&bstream, indexBits);
 
-            epR[0] = bcdec__unquantize(r[partitionSet * 2 + 0], actual_bits_count[0][mode], isSigned);
-            epG[0] = bcdec__unquantize(g[partitionSet * 2 + 0], actual_bits_count[0][mode], isSigned);
-            epB[0] = bcdec__unquantize(b[partitionSet * 2 + 0], actual_bits_count[0][mode], isSigned);
-            epR[1] = bcdec__unquantize(r[partitionSet * 2 + 1], actual_bits_count[0][mode], isSigned);
-            epG[1] = bcdec__unquantize(g[partitionSet * 2 + 1], actual_bits_count[0][mode], isSigned);
-            epB[1] = bcdec__unquantize(b[partitionSet * 2 + 1], actual_bits_count[0][mode], isSigned);
-
+            ep_i = partitionSet * 2;
             decompressed[j * 3 + 0] = bcdec__finish_unquantize(
-                                            bcdec__interpolate(epR[0], epR[1], (mode >= 10) ? aWeight4 : aWeight3, index), isSigned);
+                                            bcdec__interpolate(r[ep_i], r[ep_i+1], weights, index), isSigned);
             decompressed[j * 3 + 1] = bcdec__finish_unquantize(
-                                            bcdec__interpolate(epG[0], epG[1], (mode >= 10) ? aWeight4 : aWeight3, index), isSigned);
+                                            bcdec__interpolate(g[ep_i], g[ep_i+1], weights, index), isSigned);
             decompressed[j * 3 + 2] = bcdec__finish_unquantize(
-                                            bcdec__interpolate(epB[0], epB[1], (mode >= 10) ? aWeight4 : aWeight3, index), isSigned);
+                                            bcdec__interpolate(b[ep_i], b[ep_i+1], weights, index), isSigned);
         }
 
         decompressed += destinationPitch;
