@@ -1,4 +1,4 @@
-﻿/* bcdec.h - v0.95
+﻿/* bcdec.h - v0.96
    provides functions to decompress blocks of BC compressed images
    written by Sergii "iOrange" Kudlai in 2022
 
@@ -26,6 +26,7 @@
    CREDITS:
       Aras Pranckevicius (@aras-p)      - BC1/BC3 decoders optimizations (up to 3x the speed)
                                         - BC6H/BC7 bits pulling routines optimizations
+                                        - optimized BC6H by moving unquantize out of the loop
                                         - Split BC6H decompression function into 'half' and
                                           'float' variants
 
@@ -430,7 +431,7 @@ BCDECDEF void bcdec_bc6h_half(const void* compressedBlock, void* decompressedBlo
     static int aWeight4[16] = { 0, 4, 9, 13, 17, 21, 26, 30, 34, 38, 43, 47, 51, 55, 60, 64 };
 
     bcdec__bitstream_t bstream;
-    int mode, partition, numPartitions, i, j, partitionSet, indexBits, index, ep_i;
+    int mode, partition, numPartitions, i, j, partitionSet, indexBits, index, ep_i, actualBits0Mode;
     int r[4], g[4], b[4];       /* wxyz */
     unsigned short* decompressed;
     int* weights;
@@ -448,6 +449,9 @@ BCDECDEF void bcdec_bc6h_half(const void* compressedBlock, void* decompressedBlo
     if (mode > 1) {
         mode |= (bcdec__bitstream_read_bits(&bstream, 3) << 2);
     }
+
+    /* modes >= 11 (10 in my code) are using 0 one, others will read it from the bitstream */
+    partition = 0;
 
     switch (mode) {
         /* mode 1 */
@@ -826,14 +830,9 @@ BCDECDEF void bcdec_bc6h_half(const void* compressedBlock, void* decompressedBlo
         }
     }
 
-    if (mode >= 10) {
-        partition = 0;
-        numPartitions = 0;
-    } else {
-        numPartitions = 1;
-    }
+    numPartitions = (mode >= 10) ? 0 : 1;
 
-    int actualBits0Mode = actual_bits_count[0][mode];
+    actualBits0Mode = actual_bits_count[0][mode];
     if (isSigned) {
         r[0] = bcdec__extend_sign(r[0], actualBits0Mode);
         g[0] = bcdec__extend_sign(g[0], actualBits0Mode);
