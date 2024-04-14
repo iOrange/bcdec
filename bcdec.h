@@ -96,6 +96,7 @@ BCDECDEF void bcdec_bc6h_float(const void* compressedBlock, void* decompressedBl
 BCDECDEF void bcdec_bc6h_half(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned);
 BCDECDEF void bcdec_bc7(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
 
+#endif /* BCDEC_HEADER_INCLUDED */
 
 #ifdef BCDEC_IMPLEMENTATION
 
@@ -1268,8 +1269,6 @@ BCDECDEF void bcdec_bc7(const void* compressedBlock, void* decompressedBlock, in
 }
 
 #endif /* BCDEC_IMPLEMENTATION */
-
-#endif /* BCDEC_HEADER_INCLUDED */
 
 /* LICENSE:
 
