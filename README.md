@@ -44,3 +44,10 @@ Used HDRI image "Lythwood Room" from <https://polyhaven.com/a/lythwood_room> lic
      - BC6H/BC7 bits pulling routines optimizations
      - optimized BC6H by moving unquantize out of the loop
      - Split BC6H decompression function into 'half' and 'float' variants
+  
+ - Michael Schmidt (@RunDevelopment)
+     - Found better "magic" coefficients for integer interpolation
+       of reference colors in BC1 color block, that match with
+       the floating point interpolation. This also made it faster
+       than integer division by 3!
+
