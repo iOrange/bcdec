@@ -208,19 +208,19 @@ static void bcdec__smooth_alpha_block(const void* compressedBlock, void* decompr
 
     if (alpha[0] > alpha[1]) {
         /* 6 interpolated alpha values. */
-        alpha[2] = (6 * alpha[0] +     alpha[1] + 1) / 7;   /* 6/7*alpha_0 + 1/7*alpha_1 */
-        alpha[3] = (5 * alpha[0] + 2 * alpha[1] + 1) / 7;   /* 5/7*alpha_0 + 2/7*alpha_1 */
-        alpha[4] = (4 * alpha[0] + 3 * alpha[1] + 1) / 7;   /* 4/7*alpha_0 + 3/7*alpha_1 */
-        alpha[5] = (3 * alpha[0] + 4 * alpha[1] + 1) / 7;   /* 3/7*alpha_0 + 4/7*alpha_1 */
-        alpha[6] = (2 * alpha[0] + 5 * alpha[1] + 1) / 7;   /* 2/7*alpha_0 + 5/7*alpha_1 */
-        alpha[7] = (    alpha[0] + 6 * alpha[1] + 1) / 7;   /* 1/7*alpha_0 + 6/7*alpha_1 */
+        alpha[2] = (6 * alpha[0] +     alpha[1] + 3) / 7;   /* 6/7*alpha_0 + 1/7*alpha_1 */
+        alpha[3] = (5 * alpha[0] + 2 * alpha[1] + 3) / 7;   /* 5/7*alpha_0 + 2/7*alpha_1 */
+        alpha[4] = (4 * alpha[0] + 3 * alpha[1] + 3) / 7;   /* 4/7*alpha_0 + 3/7*alpha_1 */
+        alpha[5] = (3 * alpha[0] + 4 * alpha[1] + 3) / 7;   /* 3/7*alpha_0 + 4/7*alpha_1 */
+        alpha[6] = (2 * alpha[0] + 5 * alpha[1] + 3) / 7;   /* 2/7*alpha_0 + 5/7*alpha_1 */
+        alpha[7] = (    alpha[0] + 6 * alpha[1] + 3) / 7;   /* 1/7*alpha_0 + 6/7*alpha_1 */
     }
     else {
         /* 4 interpolated alpha values. */
-        alpha[2] = (4 * alpha[0] +     alpha[1] + 1) / 5;   /* 4/5*alpha_0 + 1/5*alpha_1 */
-        alpha[3] = (3 * alpha[0] + 2 * alpha[1] + 1) / 5;   /* 3/5*alpha_0 + 2/5*alpha_1 */
-        alpha[4] = (2 * alpha[0] + 3 * alpha[1] + 1) / 5;   /* 2/5*alpha_0 + 3/5*alpha_1 */
-        alpha[5] = (    alpha[0] + 4 * alpha[1] + 1) / 5;   /* 1/5*alpha_0 + 4/5*alpha_1 */
+        alpha[2] = (4 * alpha[0] +     alpha[1] + 2) / 5;   /* 4/5*alpha_0 + 1/5*alpha_1 */
+        alpha[3] = (3 * alpha[0] + 2 * alpha[1] + 2) / 5;   /* 3/5*alpha_0 + 2/5*alpha_1 */
+        alpha[4] = (2 * alpha[0] + 3 * alpha[1] + 2) / 5;   /* 2/5*alpha_0 + 3/5*alpha_1 */
+        alpha[5] = (    alpha[0] + 4 * alpha[1] + 2) / 5;   /* 1/5*alpha_0 + 4/5*alpha_1 */
         alpha[6] = 0x00;
         alpha[7] = 0xFF;
     }
