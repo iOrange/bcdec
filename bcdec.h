@@ -23,6 +23,10 @@
 
    For more info, issues and suggestions please visit https://github.com/iOrange/bcdec
 
+   Configuration:
+      #define BCDEC_BC4BC5_PRECISE:
+         enables more precise but slower BC4/BC5 decoding + signed/unsigned mode
+
    CREDITS:
       Aras Pranckevicius (@aras-p)      - BC1/BC3 decoders optimizations (up to 3x the speed)
                                         - BC6H/BC7 bits pulling routines optimizations
@@ -45,7 +49,7 @@
 #define BCDEC_HEADER_INCLUDED
 
 #define BCDEC_VERSION_MAJOR 0
-#define BCDEC_VERSION_MINOR 97
+#define BCDEC_VERSION_MINOR 98
 
 /* if BCDEC_STATIC causes problems, try defining BCDECDEF to 'inline' or 'static inline' */
 #ifndef BCDECDEF
@@ -98,8 +102,15 @@
 BCDECDEF void bcdec_bc1(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
 BCDECDEF void bcdec_bc2(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
 BCDECDEF void bcdec_bc3(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
+#ifndef BCDEC_BC4BC5_PRECISE
 BCDECDEF void bcdec_bc4(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
 BCDECDEF void bcdec_bc5(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
+#else
+BCDECDEF void bcdec_bc4(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned);
+BCDECDEF void bcdec_bc5(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned);
+BCDECDEF void bcdec_bc4_float(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned);
+BCDECDEF void bcdec_bc5_float(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned);
+#endif
 BCDECDEF void bcdec_bc6h_float(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned);
 BCDECDEF void bcdec_bc6h_half(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned);
 BCDECDEF void bcdec_bc7(const void* compressedBlock, void* decompressedBlock, int destinationPitch);
@@ -208,19 +219,19 @@ static void bcdec__smooth_alpha_block(const void* compressedBlock, void* decompr
 
     if (alpha[0] > alpha[1]) {
         /* 6 interpolated alpha values. */
-        alpha[2] = (6 * alpha[0] +     alpha[1] + 1) / 7;   /* 6/7*alpha_0 + 1/7*alpha_1 */
-        alpha[3] = (5 * alpha[0] + 2 * alpha[1] + 1) / 7;   /* 5/7*alpha_0 + 2/7*alpha_1 */
-        alpha[4] = (4 * alpha[0] + 3 * alpha[1] + 1) / 7;   /* 4/7*alpha_0 + 3/7*alpha_1 */
-        alpha[5] = (3 * alpha[0] + 4 * alpha[1] + 1) / 7;   /* 3/7*alpha_0 + 4/7*alpha_1 */
-        alpha[6] = (2 * alpha[0] + 5 * alpha[1] + 1) / 7;   /* 2/7*alpha_0 + 5/7*alpha_1 */
-        alpha[7] = (    alpha[0] + 6 * alpha[1] + 1) / 7;   /* 1/7*alpha_0 + 6/7*alpha_1 */
+        alpha[2] = (6 * alpha[0] +     alpha[1]) / 7;   /* 6/7*alpha_0 + 1/7*alpha_1 */
+        alpha[3] = (5 * alpha[0] + 2 * alpha[1]) / 7;   /* 5/7*alpha_0 + 2/7*alpha_1 */
+        alpha[4] = (4 * alpha[0] + 3 * alpha[1]) / 7;   /* 4/7*alpha_0 + 3/7*alpha_1 */
+        alpha[5] = (3 * alpha[0] + 4 * alpha[1]) / 7;   /* 3/7*alpha_0 + 4/7*alpha_1 */
+        alpha[6] = (2 * alpha[0] + 5 * alpha[1]) / 7;   /* 2/7*alpha_0 + 5/7*alpha_1 */
+        alpha[7] = (    alpha[0] + 6 * alpha[1]) / 7;   /* 1/7*alpha_0 + 6/7*alpha_1 */
     }
     else {
         /* 4 interpolated alpha values. */
-        alpha[2] = (4 * alpha[0] +     alpha[1] + 1) / 5;   /* 4/5*alpha_0 + 1/5*alpha_1 */
-        alpha[3] = (3 * alpha[0] + 2 * alpha[1] + 1) / 5;   /* 3/5*alpha_0 + 2/5*alpha_1 */
-        alpha[4] = (2 * alpha[0] + 3 * alpha[1] + 1) / 5;   /* 2/5*alpha_0 + 3/5*alpha_1 */
-        alpha[5] = (    alpha[0] + 4 * alpha[1] + 1) / 5;   /* 1/5*alpha_0 + 4/5*alpha_1 */
+        alpha[2] = (4 * alpha[0] +     alpha[1]) / 5;   /* 4/5*alpha_0 + 1/5*alpha_1 */
+        alpha[3] = (3 * alpha[0] + 2 * alpha[1]) / 5;   /* 3/5*alpha_0 + 2/5*alpha_1 */
+        alpha[4] = (2 * alpha[0] + 3 * alpha[1]) / 5;   /* 2/5*alpha_0 + 3/5*alpha_1 */
+        alpha[5] = (    alpha[0] + 4 * alpha[1]) / 5;   /* 1/5*alpha_0 + 4/5*alpha_1 */
         alpha[6] = 0x00;
         alpha[7] = 0xFF;
     }
@@ -235,6 +246,117 @@ static void bcdec__smooth_alpha_block(const void* compressedBlock, void* decompr
         decompressed += destinationPitch;
     }
 }
+
+#ifdef BCDEC_BC4BC5_PRECISE
+static void bcdec__bc4_block(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int pixelSize, int isSigned) {
+    signed char* sblock;
+    unsigned char* ublock;
+    int alpha[8];
+    int i, j;
+    unsigned long long block, indices;
+
+    static int aWeights4[4] = { 13107, 26215, 39321, 52429 };
+    static int aWeights6[6] = { 9363, 18724, 28086, 37450, 46812, 56173 };
+
+    block = *(unsigned long long*)compressedBlock;
+
+    if (isSigned) {
+        alpha[0] = (char)(block & 0xFF);
+        alpha[1] = (char)((block >> 8) & 0xFF);
+        if (alpha[0] < -127) alpha[0] = -127;     /* -128 clamps to -127 */
+        if (alpha[1] < -127) alpha[1] = -127;     /* -128 clamps to -127 */
+    } else {
+        alpha[0] = block & 0xFF;
+        alpha[1] = (block >> 8) & 0xFF;
+    }
+
+    if (alpha[0] > alpha[1]) {
+        /* 6 interpolated alpha values. */
+        alpha[2] = (aWeights6[5] * alpha[0] + aWeights6[0] * alpha[1] + 32768) >> 16;   /* 6/7*alpha_0 + 1/7*alpha_1 */
+        alpha[3] = (aWeights6[4] * alpha[0] + aWeights6[1] * alpha[1] + 32768) >> 16;   /* 5/7*alpha_0 + 2/7*alpha_1 */
+        alpha[4] = (aWeights6[3] * alpha[0] + aWeights6[2] * alpha[1] + 32768) >> 16;   /* 4/7*alpha_0 + 3/7*alpha_1 */
+        alpha[5] = (aWeights6[2] * alpha[0] + aWeights6[3] * alpha[1] + 32768) >> 16;   /* 3/7*alpha_0 + 4/7*alpha_1 */
+        alpha[6] = (aWeights6[1] * alpha[0] + aWeights6[4] * alpha[1] + 32768) >> 16;   /* 2/7*alpha_0 + 5/7*alpha_1 */
+        alpha[7] = (aWeights6[0] * alpha[0] + aWeights6[5] * alpha[1] + 32768) >> 16;   /* 1/7*alpha_0 + 6/7*alpha_1 */
+    } else {
+        /* 4 interpolated alpha values. */
+        alpha[2] = (aWeights4[3] * alpha[0] + aWeights4[0] * alpha[1] + 32768) >> 16;   /* 4/5*alpha_0 + 1/5*alpha_1 */
+        alpha[3] = (aWeights4[2] * alpha[0] + aWeights4[1] * alpha[1] + 32768) >> 16;   /* 3/5*alpha_0 + 2/5*alpha_1 */
+        alpha[4] = (aWeights4[1] * alpha[0] + aWeights4[2] * alpha[1] + 32768) >> 16;   /* 2/5*alpha_0 + 3/5*alpha_1 */
+        alpha[5] = (aWeights4[0] * alpha[0] + aWeights4[3] * alpha[1] + 32768) >> 16;   /* 1/5*alpha_0 + 4/5*alpha_1 */
+        alpha[6] = isSigned ? -127 :   0;
+        alpha[7] = isSigned ?  127 : 255;
+    }
+
+    indices = block >> 16;
+    if (isSigned) {
+        sblock = (char*)decompressedBlock;
+        for (i = 0; i < 4; ++i) {
+            for (j = 0; j < 4; ++j) {
+                sblock[j * pixelSize] = (char)alpha[indices & 0x07];
+                indices >>= 3;
+            }
+            sblock += destinationPitch;
+        }
+    } else {
+        ublock = (unsigned char*)decompressedBlock;
+        for (i = 0; i < 4; ++i) {
+            for (j = 0; j < 4; ++j) {
+                ublock[j * pixelSize] = (unsigned char)alpha[indices & 0x07];
+                indices >>= 3;
+            }
+            ublock += destinationPitch;
+        }
+    }
+}
+
+static void bcdec__bc4_block_float(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int pixelSize, int isSigned) {
+    float* decompressed;
+    float alpha[8];
+    int i, j;
+    unsigned long long block, indices;
+
+    block = *(unsigned long long*)compressedBlock;
+    decompressed = (float*)decompressedBlock;
+
+    if (isSigned) {
+        alpha[0] = (float)((char)(block & 0xFF)) / 127.0f;
+        alpha[1] = (float)((char)((block >> 8) & 0xFF)) / 127.0f;
+        if (alpha[0] < -1.0f) alpha[0] = -1.0f;     /* -128 clamps to -127 */
+        if (alpha[1] < -1.0f) alpha[1] = -1.0f;     /* -128 clamps to -127 */
+    } else {
+        alpha[0] = (float)(block & 0xFF) / 255.0f;
+        alpha[1] = (float)((block >> 8) & 0xFF) / 255.0f;
+    }
+
+    if (alpha[0] > alpha[1]) {
+        /* 6 interpolated alpha values. */
+        alpha[2] = (6.0f * alpha[0] +        alpha[1]) / 7.0f;   /* 6/7*alpha_0 + 1/7*alpha_1 */
+        alpha[3] = (5.0f * alpha[0] + 2.0f * alpha[1]) / 7.0f;   /* 5/7*alpha_0 + 2/7*alpha_1 */
+        alpha[4] = (4.0f * alpha[0] + 3.0f * alpha[1]) / 7.0f;   /* 4/7*alpha_0 + 3/7*alpha_1 */
+        alpha[5] = (3.0f * alpha[0] + 4.0f * alpha[1]) / 7.0f;   /* 3/7*alpha_0 + 4/7*alpha_1 */
+        alpha[6] = (2.0f * alpha[0] + 5.0f * alpha[1]) / 7.0f;   /* 2/7*alpha_0 + 5/7*alpha_1 */
+        alpha[7] = (       alpha[0] + 6.0f * alpha[1]) / 7.0f;   /* 1/7*alpha_0 + 6/7*alpha_1 */
+    } else {
+        /* 4 interpolated alpha values. */
+        alpha[2] = (4.0f * alpha[0] +        alpha[1]) / 5.0f;   /* 4/5*alpha_0 + 1/5*alpha_1 */
+        alpha[3] = (3.0f * alpha[0] + 2.0f * alpha[1]) / 5.0f;   /* 3/5*alpha_0 + 2/5*alpha_1 */
+        alpha[4] = (2.0f * alpha[0] + 3.0f * alpha[1]) / 5.0f;   /* 2/5*alpha_0 + 3/5*alpha_1 */
+        alpha[5] = (       alpha[0] + 4.0f * alpha[1]) / 5.0f;   /* 1/5*alpha_0 + 4/5*alpha_1 */
+        alpha[6] = isSigned ? -1.0f : 0.0f;
+        alpha[7] = 1.0f;
+    }
+
+    indices = block >> 16;
+    for (i = 0; i < 4; ++i) {
+        for (j = 0; j < 4; ++j) {
+            decompressed[j * pixelSize] = alpha[indices & 0x07];
+            indices >>= 3;
+        }
+        decompressed += destinationPitch;
+    }
+}
+#endif /* BCDEC_BC4BC5_PRECISE */
 
 typedef struct bcdec__bitstream {
     unsigned long long low;
@@ -288,14 +410,36 @@ BCDECDEF void bcdec_bc3(const void* compressedBlock, void* decompressedBlock, in
     bcdec__smooth_alpha_block(compressedBlock, ((char*)decompressedBlock) + 3, destinationPitch, 4);
 }
 
+#ifndef BCDEC_BC4BC5_PRECISE
 BCDECDEF void bcdec_bc4(const void* compressedBlock, void* decompressedBlock, int destinationPitch) {
     bcdec__smooth_alpha_block(compressedBlock, decompressedBlock, destinationPitch, 1);
+#else
+BCDECDEF void bcdec_bc4(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned) {
+    bcdec__bc4_block(compressedBlock, decompressedBlock, destinationPitch, 1, isSigned);
+#endif
 }
 
+#ifndef BCDEC_BC4BC5_PRECISE
 BCDECDEF void bcdec_bc5(const void* compressedBlock, void* decompressedBlock, int destinationPitch) {
     bcdec__smooth_alpha_block(compressedBlock, decompressedBlock, destinationPitch, 2);
     bcdec__smooth_alpha_block(((char*)compressedBlock) + 8, ((char*)decompressedBlock) + 1, destinationPitch, 2);
+#else
+BCDECDEF void bcdec_bc5(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned) {
+    bcdec__bc4_block(compressedBlock, decompressedBlock, destinationPitch, 2, isSigned);
+    bcdec__bc4_block(((char*)compressedBlock) + 8, ((char*)decompressedBlock) + 1, destinationPitch, 2, isSigned);
+#endif
 }
+
+#ifdef BCDEC_BC4BC5_PRECISE
+BCDECDEF void bcdec_bc4_float(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned) {
+    bcdec__bc4_block_float(compressedBlock, decompressedBlock, destinationPitch, 1, isSigned);
+}
+
+BCDECDEF void bcdec_bc5_float(const void* compressedBlock, void* decompressedBlock, int destinationPitch, int isSigned) {
+    bcdec__bc4_block_float(compressedBlock, decompressedBlock, destinationPitch, 2, isSigned);
+    bcdec__bc4_block_float(((char*)compressedBlock) + 8, ((float*)decompressedBlock) + 1, destinationPitch, 2, isSigned);
+}
+#endif /* BCDEC_BC4BC5_PRECISE */
 
 /* http://graphics.stanford.edu/~seander/bithacks.html#VariableSignExtend */
 static int bcdec__extend_sign(int val, int bits) {

@@ -3,10 +3,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define STB_IMAGE_WRITE_IMPLEMENTATION 1
+#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-#define BCDEC_IMPLEMENTATION 1
+#define BCDEC_IMPLEMENTATION
+#define BCDEC_BC4BC5_PRECISE
 #include "bcdec.h"
 
 #define BCDEC_FOURCC(a, b, c, d) ((a) | ((b) << 8) | ((c) << 16) | ((d) << 24))
@@ -15,10 +16,14 @@
 #define BCDEC_FOURCC_DXT1   BCDEC_FOURCC('D', 'X', 'T', '1')
 #define BCDEC_FOURCC_DXT3   BCDEC_FOURCC('D', 'X', 'T', '3')
 #define BCDEC_FOURCC_DXT5   BCDEC_FOURCC('D', 'X', 'T', '5')
+#define BCDEC_FOURCC_ATI1   BCDEC_FOURCC('A', 'T', 'I', '1')
+#define BCDEC_FOURCC_ATI2   BCDEC_FOURCC('A', 'T', 'I', '2')
 #define BCDEC_FOURCC_DX10   BCDEC_FOURCC('D', 'X', '1', '0')
 
 #define DXGI_FORMAT_BC4_UNORM   80
+#define DXGI_FORMAT_BC4_SNORM   81
 #define DXGI_FORMAT_BC5_UNORM   83
+#define DXGI_FORMAT_BC5_SNORM   84
 #define DXGI_FORMAT_BC6H_UF16   95
 #define DXGI_FORMAT_BC6H_SF16   96
 #define DXGI_FORMAT_BC7_UNORM   98
@@ -111,14 +116,20 @@ int load_dds(const char* filePath, int* w, int* h, unsigned int* fourcc, void** 
         compressedSize = BCDEC_BC1_COMPRESSED_SIZE(ddsDesc.dwWidth, ddsDesc.dwHeight);
     } else if (ddsDesc.ddpfPixelFormat.dwFourCC == BCDEC_FOURCC_DXT3 || ddsDesc.ddpfPixelFormat.dwFourCC == BCDEC_FOURCC_DXT5) {
         compressedSize = BCDEC_BC3_COMPRESSED_SIZE(ddsDesc.dwWidth, ddsDesc.dwHeight);
+    } else if (ddsDesc.ddpfPixelFormat.dwFourCC == BCDEC_FOURCC_ATI1) {
+        compressedSize = BCDEC_BC4_COMPRESSED_SIZE(ddsDesc.dwWidth, ddsDesc.dwHeight);
+        *fourcc = DXGI_FORMAT_BC4_UNORM;
+    } else if (ddsDesc.ddpfPixelFormat.dwFourCC == BCDEC_FOURCC_ATI2) {
+        compressedSize = BCDEC_BC5_COMPRESSED_SIZE(ddsDesc.dwWidth, ddsDesc.dwHeight);
+        *fourcc = DXGI_FORMAT_BC5_UNORM;
     } else if (ddsDesc.ddpfPixelFormat.dwFourCC == BCDEC_FOURCC_DX10) {
         fread(&dx10Desc, 1, sizeof(dx10Desc), f);
 
         *fourcc = dx10Desc.dxgiFormat;
 
-        if (dx10Desc.dxgiFormat == DXGI_FORMAT_BC4_UNORM) {
+        if (dx10Desc.dxgiFormat == DXGI_FORMAT_BC4_UNORM || dx10Desc.dxgiFormat == DXGI_FORMAT_BC4_SNORM) {
             compressedSize = BCDEC_BC4_COMPRESSED_SIZE(ddsDesc.dwWidth, ddsDesc.dwHeight);
-        } else if (dx10Desc.dxgiFormat == DXGI_FORMAT_BC5_UNORM) {
+        } else if (dx10Desc.dxgiFormat == DXGI_FORMAT_BC5_UNORM || dx10Desc.dxgiFormat == DXGI_FORMAT_BC5_SNORM) {
             compressedSize = BCDEC_BC5_COMPRESSED_SIZE(ddsDesc.dwWidth, ddsDesc.dwHeight);
         } else if (dx10Desc.dxgiFormat == DXGI_FORMAT_BC6H_UF16 || dx10Desc.dxgiFormat == DXGI_FORMAT_BC6H_SF16) {
             compressedSize = BCDEC_BC6H_COMPRESSED_SIZE(ddsDesc.dwWidth, ddsDesc.dwHeight);
@@ -143,8 +154,10 @@ const char* format_name(int format) {
         case BCDEC_FOURCC_DXT1:     return "BC1";
         case BCDEC_FOURCC_DXT3:     return "BC2";
         case BCDEC_FOURCC_DXT5:     return "BC3";
-        case DXGI_FORMAT_BC4_UNORM: return "BC4";
-        case DXGI_FORMAT_BC5_UNORM: return "BC5";
+        case DXGI_FORMAT_BC4_UNORM: return "BC4U";
+        case DXGI_FORMAT_BC4_SNORM: return "BC4S";
+        case DXGI_FORMAT_BC5_UNORM: return "BC5U";
+        case DXGI_FORMAT_BC5_SNORM: return "BC5S";
         case DXGI_FORMAT_BC7_UNORM: return "BC7";
         case DXGI_FORMAT_BC6H_UF16: return "BC6H Unsigned";
         case DXGI_FORMAT_BC6H_SF16: return "BC6H Signed";
@@ -153,9 +166,10 @@ const char* format_name(int format) {
 }
 
 int main(int argc, char** argv) {
-    int w, h, fourcc, i, j;
-    char* compData, * uncompData, * src, * dst;
+    int w, h, fourcc, i, j, ii, jj;
+    char* compData, * uncompData, * src, * dst, * temp;
     float* uncompDataHDR, * dstHDR;
+    char tempBlock[16*2]; // used for bc5 2 channels to 3 channels expansion
     char path[260];
 
     if (argc < 2) {
@@ -216,7 +230,8 @@ int main(int argc, char** argv) {
                 stbi_write_tga(path, w, h, 4, uncompData);
             } break;
 
-            case DXGI_FORMAT_BC4_UNORM: {
+            case DXGI_FORMAT_BC4_UNORM:
+            case DXGI_FORMAT_BC4_SNORM: {
                 uncompData = (char*)malloc(w * h);
                 src = compData;
                 dst = uncompData;
@@ -224,7 +239,11 @@ int main(int argc, char** argv) {
                 for (i = 0; i < h; i += 4) {
                     for (j = 0; j < w; j += 4) {
                         dst = uncompData + (i * w + j);
+#ifdef BCDEC_BC4BC5_PRECISE
+                        bcdec_bc4(src, dst, w, fourcc == DXGI_FORMAT_BC4_SNORM);
+#else
                         bcdec_bc4(src, dst, w);
+#endif
                         src += BCDEC_BC4_BLOCK_SIZE;
                     }
                 }
@@ -238,16 +257,32 @@ int main(int argc, char** argv) {
                 stbi_write_tga(path, w, h, 1, uncompData);
             } break;
 
-            case DXGI_FORMAT_BC5_UNORM: {
-                uncompData = (char*)malloc(w * h * 2);
+            case DXGI_FORMAT_BC5_UNORM:
+            case DXGI_FORMAT_BC5_SNORM: {
+                uncompData = (char*)malloc(w * h * 3);
                 src = compData;
                 dst = uncompData;
 
                 for (i = 0; i < h; i += 4) {
                     for (j = 0; j < w; j += 4) {
-                        dst = uncompData + (i * w + j) * 2;
-                        bcdec_bc5(src, dst, w * 2);
+                        dst = uncompData + (i * w + j) * 3;
+#ifdef BCDEC_BC4BC5_PRECISE
+                        bcdec_bc5(src, tempBlock, 4*2, fourcc == DXGI_FORMAT_BC5_SNORM);
+#else
+                        bcdec_bc5(src, tempBlock, 4*2);
+#endif
                         src += BCDEC_BC5_BLOCK_SIZE;
+
+                        /* copy 2 channels from temp buffer to the ourput */
+                        temp = tempBlock;
+                        for (ii = 0; ii < 4; ++ii) {
+                            for (jj = 0; jj < 4; ++jj, temp += 2) {
+                                dst[jj * 3 + 0] = temp[0];
+                                dst[jj * 3 + 1] = temp[1];
+                                dst[jj * 3 + 2] = 0;
+                            }
+                            dst += w * 3;
+                        }
                     }
                 }
 
@@ -257,7 +292,7 @@ int main(int argc, char** argv) {
                 path[i - 1] = 'a';
 
                 printf("Writing output to %s\n", path);
-                stbi_write_tga(path, w, h, 2, uncompData);
+                stbi_write_tga(path, w, h, 3, uncompData);
             } break;
 
             case DXGI_FORMAT_BC6H_UF16:
