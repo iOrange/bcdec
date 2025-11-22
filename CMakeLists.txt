@@ -5,7 +5,20 @@ cmake_minimum_required (VERSION 3.8)
 
 project ("bcdec" LANGUAGES C)
 
-# Add source to this project's executable.
-add_executable (bcdec  "bcdec.h" "test.c")
+option(BCDEC_BUILD_TESTS "Build test executable" OFF)
+option(BCDEC_STATIC_LIB "Build as static library instead of interface library" OFF)
 
-# TODO: Add tests and install targets if needed.
+if(BCDEC_STATIC_LIB)
+  # Static library - compiled implementation
+  add_library(bcdec STATIC bcdec.h bcdec.c)
+  target_include_directories(bcdec PUBLIC ${CMAKE_CURRENT_LIST_DIR})
+else()
+  # Interface library - header-only, requires BCDEC_IMPLEMENTATION definition
+  add_library(bcdec INTERFACE bcdec.h)
+  target_include_directories(bcdec INTERFACE ${CMAKE_CURRENT_LIST_DIR})
+endif()
+
+# Optionally build test executable
+if(BCDEC_BUILD_TESTS)
+  add_executable(bcdec_test "bcdec.h" "test.c")
+endif()
